@@ -1,0 +1,17 @@
+{
+  "id": "musix_analysis",
+  "name": "Musix Analysis",
+  "author": "Musix",
+  "description": "For the Musix app: measures each song's loudness and how it starts and ends (levelling and SmoothFade), and finds similar albums and artists from AudioMuse-AI's sound analysis.",
+  "requirements": [],
+  "versions": [
+    {
+      "version": "0.1.0",
+      "min_core_version": "3.6.4",
+      "changelog": "First version: volume and fade profiles, similar albums and artists, each with its own progress.",
+      "imageUrl": "",
+      "sourceUrl": "https://raw.githubusercontent.com/Musix-Industreez/musix-audiomuse-plugin/main/dist/musix_analysis-0.1.0.zip",
+      "checksum": "c1e41c29907421c17c707fc5506c2d6d"
+    }
+  ]
+}

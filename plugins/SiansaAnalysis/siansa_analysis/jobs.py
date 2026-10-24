@@ -60,10 +60,10 @@ def on_song_analyzed(song):
     try:
         started = time.monotonic()
         store.save_profile(db, canonical, profile_of(loudness.measure_file(path, HOOK_BUDGET_SECONDS)))
-        logger.debug("musix_analysis measured %s in %.1f s", canonical, time.monotonic() - started)
+        logger.debug("siansa_analysis measured %s in %.1f s", canonical, time.monotonic() - started)
     except Exception as e:  # never break the analysis; the tick tries again later
         db.rollback()
-        logger.warning("musix_analysis couldn't measure %s after analysis: %s", canonical, e)
+        logger.warning("siansa_analysis couldn't measure %s after analysis: %s", canonical, e)
         store.save_failure(db, canonical, e)
 
 
@@ -103,7 +103,7 @@ def measure_missing(budget_seconds=None, batch=None):
     measured = failed = skipped = 0
     all_on = measure_all_on(db)
     budget = budget_seconds or status.round_seconds(all_on)
-    folder = tempfile.mkdtemp(prefix="musix_analysis_")
+    folder = tempfile.mkdtemp(prefix="siansa_analysis_")
     rate = store.get_state("profiles_rate", {}, db) or {}
     try:
         limit = 10_000 if all_on else max(1, min(int(batch or get_setting("batch_size", DEFAULT_BATCH) or DEFAULT_BATCH), 500))
@@ -138,7 +138,7 @@ def measure_missing(budget_seconds=None, batch=None):
                 except Exception as e:
                     db.rollback()
                     failed += 1
-                    logger.info("musix_analysis couldn't measure %s: %s", item_id, e)
+                    logger.info("siansa_analysis couldn't measure %s: %s", item_id, e)
                     store.save_failure(db, item_id, e)
                 finally:
                     if path and os.path.exists(path):
@@ -150,16 +150,16 @@ def measure_missing(budget_seconds=None, batch=None):
         store.set_state("profiles_rate", status.next_rate(rate, measured + failed, seconds), db)
         if all_on and not store.songs_to_measure(db, 1, include_imported=True):
             store.set_state("measure_all", {"on": False, "finished_at": now_iso()}, db)
-            logger.info("musix_analysis: every song is measured")
+            logger.info("siansa_analysis: every song is measured")
         result = {"status": "idle", "finished_at": now_iso(), "measured": measured, "failed": failed,
                   "other_server": skipped, "seconds": seconds, "error": None}
         store.set_state("profiles_job", result, db)
-        logger.info("musix_analysis profiles: %s measured, %s failed in %.0f s", measured, failed, seconds)
+        logger.info("siansa_analysis profiles: %s measured, %s failed in %.0f s", measured, failed, seconds)
         return result
     except Exception as e:
         db.rollback()
         store.set_state("profiles_job", {"status": "failed", "finished_at": now_iso(), "error": str(e)[:300]}, db)
-        logger.exception("musix_analysis profile run failed")
+        logger.exception("siansa_analysis profile run failed")
         return {"status": "failed", "error": str(e)}
     finally:
         shutil.rmtree(folder, ignore_errors=True)
@@ -177,7 +177,7 @@ def refresh_inputs(db=None):
     current = generations.advance(stored, library, songs, analysis, analysed)
     if current != stored:
         store.set_state("inputs", current.to_json(), db)
-        logger.info("musix_analysis inputs: library generation %s, analysis generation %s",
+        logger.info("siansa_analysis inputs: library generation %s, analysis generation %s",
                     current.library_generation, current.analysis_generation)
     return current
 
@@ -196,7 +196,7 @@ def build_similar(force=False):
             reason = reason or "asked for"
         if not reason:
             return {"status": "current"}
-        logger.info("musix_analysis building similar albums and artists: %s", reason)
+        logger.info("siansa_analysis building similar albums and artists: %s", reason)
 
         def progress(phase):
             def report(done, total):
@@ -235,13 +235,13 @@ def build_similar(force=False):
         store.set_state("similar_built", result, db, commit=False)
         store.set_state("similar_job", {"status": "idle", "finished_at": result["finished_at"]}, db, commit=False)
         db.commit()
-        logger.info("musix_analysis similar lists: %s albums, %s artists in %.0f s",
+        logger.info("siansa_analysis similar lists: %s albums, %s artists in %.0f s",
                     result["albums"], result["artists"], result["seconds"])
         return {"status": "built", **result}
     except Exception as e:
         db.rollback()
         store.set_state("similar_job", {"status": "failed", "finished_at": now_iso(), "error": str(e)[:300]}, db)
-        logger.exception("musix_analysis similar build failed")
+        logger.exception("siansa_analysis similar build failed")
         return {"status": "failed", "error": str(e)}
     finally:
         store.unlock(db, "similar")
@@ -256,7 +256,7 @@ def tick():
         try:
             result[name] = job()
         except Exception as e:  # one part failing must not stop the other
-            logger.exception("musix_analysis %s failed", name)
+            logger.exception("siansa_analysis %s failed", name)
             result[name] = {"status": "failed", "error": str(e)}
     return result
 

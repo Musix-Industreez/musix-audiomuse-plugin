@@ -1,6 +1,6 @@
-"""Musix Analysis: the AudioMuse-AI plugin for the Musix app (issue #188).
+"""Siansa Analysis: the AudioMuse-AI plugin for the Siansa app (issue #188).
 
-* Measures every song's loudness and how it starts and ends, for levelling and SmoothFade in Musix.
+* Measures every song's loudness and how it starts and ends, for levelling and SmoothFade in Siansa.
 * Finds similar albums and artists from AudioMuse-AI's sound analysis, and rebuilds them when the library
   or the analysis changes.
 

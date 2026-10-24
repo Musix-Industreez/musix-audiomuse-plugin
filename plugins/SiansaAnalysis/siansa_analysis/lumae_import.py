@@ -9,7 +9,7 @@ Both plugins keep their data in AudioMuse-AI's database, so the import is one SQ
   ``track_server_map`` turns that into its own id (``score.item_id``), and on the default server the ids are the
   same anyway.
 * Loudness is BS.1770 in both. A ramp is the same 3-byte layout in both (int8 dB, little-endian uint16 chunks);
-  Lumae records other levels, which Musix reads just as well (it looks up −18 dB, which both have).
+  Lumae records other levels, which Siansa reads just as well (it looks up −18 dB, which both have).
 * Only songs this plugin hasn't measured itself are filled in. Imported rows say ``source='lumae'``, so
   "Measure all songs" can measure them again here.
 """
@@ -36,7 +36,7 @@ def available(db):
         return int(cur.fetchone()[0] or 0)
     except Exception:
         db.rollback()
-        logger.warning("musix_analysis couldn't look for Lumae's profiles", exc_info=True)
+        logger.warning("siansa_analysis couldn't look for Lumae's profiles", exc_info=True)
         return 0
     finally:
         cur.close()
@@ -83,7 +83,7 @@ def run(db):
         cur.execute(f"DELETE FROM {store.table('wanted')} w USING {table} p "
                     "WHERE p.item_id = w.item_id AND p.status = 'ready'")
         db.commit()
-        logger.info("musix_analysis imported %s profiles from Lumae", count)
+        logger.info("siansa_analysis imported %s profiles from Lumae", count)
         return count
     except Exception:
         db.rollback()

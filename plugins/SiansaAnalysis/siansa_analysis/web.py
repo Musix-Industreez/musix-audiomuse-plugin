@@ -1,9 +1,9 @@
-"""The plugin's pages and its API for the Musix app, mounted at ``/plugins/musix_analysis/``.
+"""The plugin's pages and its API for the Siansa app, mounted at ``/plugins/siansa_analysis/``.
 
 API (JSON, for any logged-in user or API token):
 
 * ``GET api/health``: the plugin is there and working;
-* ``GET api/profiles?ids=a,b,…``: loudness and fade profiles of up to 500 songs (the layout Musix reads);
+* ``GET api/profiles?ids=a,b,…``: loudness and fade profiles of up to 500 songs (the layout Siansa reads);
 * ``GET api/status``: how far each part is;
 * ``GET api/similar/albums?track_id=…``: albums that sound like the album of that song;
 * ``GET api/similar/artists?track_id=…`` or ``?artist=…``: artists that sound like that one.
@@ -21,7 +21,7 @@ from plugin.api import enqueue, get_db, get_setting, logger, manage_plugins_url,
 
 from . import generations, jobs, lumae_import, similarity, status, store
 
-PLUGIN_ID = "musix_analysis"
+PLUGIN_ID = "siansa_analysis"
 VERSION = "0.1.2.1"
 SCHEMA_VERSION = 1
 MAX_IDS = 500
@@ -86,7 +86,7 @@ def health():
             "profiles": state["profiles"].to_json(), "similar": state["similar"].to_json(),
         })
     except Exception as e:
-        logger.exception("musix_analysis health check failed")
+        logger.exception("siansa_analysis health check failed")
         return jsonify({"plugin": PLUGIN_ID, "plugin_version": VERSION, "status": "error", "error": str(e)[:200]})
 
 
@@ -110,7 +110,7 @@ def profiles():
             store.mark_wanted(db, {canonical.get(i, i) for i in pending})
         except Exception:
             db.rollback()
-            logger.warning("musix_analysis couldn't note asked-for songs", exc_info=True)
+            logger.warning("siansa_analysis couldn't note asked-for songs", exc_info=True)
     return jsonify({"schema_version": SCHEMA_VERSION, "profiles": out, "pending": pending})
 
 
@@ -260,7 +260,7 @@ def render_settings(state, batch_size, message=""):
   <div class="mx-head"><h3>2. Volume &amp; fade profiles</h3>{_badge(p)}</div>
   {_meter(p, "Songs measured")}
   <p><strong>{escape(p.detail)}.</strong> {counts['to_measure']:,} still to measure{f", {counts['asked_for']:,} asked for by the app first" if counts['asked_for'] else ""}.</p>
-  <p class="mx-help">Loudness levels the volume and the fade profile lets Musix fade songs the way they
+  <p class="mx-help">Loudness levels the volume and the fade profile lets Siansa fade songs the way they
     start and end (SmoothFade). New songs are measured right after AudioMuse analyses them; older ones a
     batch at a time every 15 minutes. This runs on its own: it doesn't wait for the similar lists, and
     they don't wait for it.</p>
@@ -316,7 +316,7 @@ def _start(func):
         enqueue(func, queue="high")
         return True
     except Exception as e:  # AudioMuse's "Another queue job is already running"
-        logger.info("musix_analysis job not started now: %s", e)
+        logger.info("siansa_analysis job not started now: %s", e)
         return False
 
 
@@ -347,7 +347,7 @@ def settings():
                 count = lumae_import.run(db)
                 return redirect(url_for(f"{PLUGIN_ID}.settings", note="imported", n=count))
             except Exception as e:
-                logger.exception("musix_analysis Lumae import failed")
+                logger.exception("siansa_analysis Lumae import failed")
                 note = "import_failed"
         elif action == "save":
             return redirect(manage_plugins_url())
@@ -357,7 +357,7 @@ def settings():
         jobs.refresh_inputs(db)  # cheap: two digests; keeps the generations shown here current
     except Exception:
         db.rollback()
-        logger.warning("musix_analysis couldn't read the inputs", exc_info=True)
+        logger.warning("siansa_analysis couldn't read the inputs", exc_info=True)
     state = collect(db)
     state["failures"] = store.recent_failures(db)
     state["measure_all"] = bool((store.get_state("measure_all", {}, db) or {}).get("on"))
@@ -365,4 +365,4 @@ def settings():
     state["lumae"] = lumae_import.available(db)  # TEMPORARY until plugin 0.1.3 (issue #225)
     note = MESSAGES.get(request.args.get("note", ""), "").replace("{n}", f"{request.args.get('n', 0, type=int):,}")
     body = render_settings(state, get_setting("batch_size", jobs.DEFAULT_BATCH), note)
-    return render_page(body, title="Musix Analysis")
+    return render_page(body, title="Siansa Analysis")

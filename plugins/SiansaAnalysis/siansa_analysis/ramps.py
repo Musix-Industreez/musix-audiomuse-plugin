@@ -1,4 +1,4 @@
-"""How a song starts and ends (the MixRamp idea from the MPD player), and the small blobs Musix reads.
+"""How a song starts and ends (the MixRamp idea from the MPD player), and the small blobs Siansa reads.
 
 A ramp is a list of ``(level, chunk)`` pairs. ``level`` is in dB relative to the song's own loudness;
 ``chunk`` counts 100 ms chunks:
@@ -8,13 +8,13 @@ A ramp is a list of ``(level, chunk)`` pairs. ``level`` is in dB relative to the
   while before the end).
 
 On the wire each pair is 3 bytes, a signed 8-bit level and a little-endian unsigned 16-bit chunk index,
-base64-encoded: the layout Musix has read since issue #60 (``RampCodec`` in the app).
+base64-encoded: the layout Siansa has read since issue #60 (``RampCodec`` in the app).
 """
 
 import base64
 import struct
 
-# The levels a ramp records, quietest first. Musix fades on -18 dB (Crossfade.QUIET_DB); the others let it
+# The levels a ramp records, quietest first. Siansa fades on -18 dB (Crossfade.QUIET_DB); the others let it
 # pick another level later without measuring again. At most 15 levels fit a ramp.
 LEVELS = (-60, -48, -36, -30, -24, -21, -18, -15, -12, -9, -6, -3, 0, 3, 6)
 MAX_LEVELS = 15
@@ -45,7 +45,7 @@ def end_ramp(relative):
 
 
 def encode(pairs):
-    """``[(level, chunk), …]`` as the base64 blob Musix decodes."""
+    """``[(level, chunk), …]`` as the base64 blob Siansa decodes."""
     if len(pairs) > MAX_LEVELS:
         raise ValueError(f"a ramp holds at most {MAX_LEVELS} levels")
     raw = b"".join(struct.pack("<bH", int(level), int(chunk)) for level, chunk in pairs)

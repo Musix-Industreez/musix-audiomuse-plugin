@@ -1,6 +1,6 @@
 """The plugin's own tables, and the queries on AudioMuse-AI's tables it reads.
 
-Tables (each named ``plugin_musix_analysis__<name>`` by AudioMuse-AI):
+Tables (each named ``plugin_siansa_analysis__<name>`` by AudioMuse-AI):
 
 * ``profiles``: one row per song, its loudness and ramps, or why it couldn't be measured;
 * ``wanted``: songs the app asked for that have no profile yet, measured first;
@@ -12,7 +12,7 @@ Songs are keyed by AudioMuse-AI's canonical id (``score.item_id``).
 
 import json
 
-from plugin.api import get_db, table
+from plugin.api import get_db, logger, table
 
 ANALYZER_VERSION = 1
 RETRY_HOURS = (1, 6, 24, 72)  # wait after the 1st, 2nd, 3rd, later failure
@@ -62,10 +62,51 @@ def migrate(db):
     cur.execute(
         "INSERT INTO cron (name, task_type, cron_expr, enabled) VALUES (%s, %s, %s, TRUE) "
         "ON CONFLICT (task_type) DO NOTHING",
-        ("plugin.musix_analysis.tick", "plugin.musix_analysis.tick", "*/15 * * * *"),
+        ("plugin.siansa_analysis.tick", "plugin.siansa_analysis.tick", "*/15 * * * *"),
     )
-    db.commit()
     cur.close()
+    carry_over(db)
+    db.commit()
+
+
+# ---- carrying over from the plugin's earlier name ------------------------------------------------------------
+
+# Before the app was renamed Siansa (issue #360), this plugin was "musix_analysis", with its tables named
+# plugin_musix_analysis__<name>. Installing this one copies what that one gathered (measured songs, similar
+# lists, job state), so nothing has to be measured again. Install this before uninstalling the earlier one.
+LEGACY_PREFIX = "plugin_musix_analysis__"
+LEGACY_TICK = "plugin.musix_analysis.tick"
+CARRIED = ("profiles", "wanted", "state", "similar_albums", "similar_artists")
+
+
+def carry_over(db):
+    """Copies each of the earlier plugin's tables into this one's, when it exists and this one is still empty."""
+    cur = db.cursor()
+    copied = {}
+    for name in CARRIED:
+        old, new = LEGACY_PREFIX + name, table(name)
+        cur.execute("SELECT to_regclass(%s)", (old,))
+        if cur.fetchone()[0] is None:
+            continue
+        cur.execute(f"SELECT EXISTS (SELECT 1 FROM {new})")
+        if cur.fetchone()[0]:
+            continue
+        # Only the columns both have, in this table's order (a column added later starts with its default).
+        cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name=%s", (old,))
+        old_columns = {row[0] for row in cur.fetchall()}
+        cur.execute(
+            "SELECT column_name FROM information_schema.columns WHERE table_name=%s ORDER BY ordinal_position", (new,))
+        columns = ", ".join(row[0] for row in cur.fetchall() if row[0] in old_columns)
+        if not columns:
+            continue
+        cur.execute(f"INSERT INTO {new} ({columns}) SELECT {columns} FROM {old} ON CONFLICT DO NOTHING")
+        copied[name] = cur.rowcount
+    if copied:
+        # The earlier plugin's tick would measure the same songs again: this one takes over.
+        cur.execute("DELETE FROM cron WHERE task_type=%s", (LEGACY_TICK,))
+        logger.info("siansa_analysis carried over from musix_analysis: %s", copied)
+    cur.close()
+    return copied
 
 
 # ---- state -------------------------------------------------------------------------------------------------
@@ -97,7 +138,7 @@ def set_state(name, value, db=None, commit=True):
 def try_lock(db, name):
     """A session lock so only one worker runs a job at a time; ``False`` when another one holds it."""
     cur = db.cursor()
-    cur.execute("SELECT pg_try_advisory_lock(hashtext('musix_analysis'), hashtext(%s))", (name,))
+    cur.execute("SELECT pg_try_advisory_lock(hashtext('siansa_analysis'), hashtext(%s))", (name,))
     got = bool(cur.fetchone()[0])
     cur.close()
     db.commit()
@@ -107,7 +148,7 @@ def try_lock(db, name):
 def unlock(db, name):
     db.rollback()
     cur = db.cursor()
-    cur.execute("SELECT pg_advisory_unlock(hashtext('musix_analysis'), hashtext(%s))", (name,))
+    cur.execute("SELECT pg_advisory_unlock(hashtext('siansa_analysis'), hashtext(%s))", (name,))
     cur.close()
     db.commit()
 
@@ -141,7 +182,7 @@ def analysis_digest(db):
 
 def similarity_tracks(db):
     """``(item_id, album, album_artist, author, embedding bytes)`` of every analysed song, streamed."""
-    cur = db.cursor(name="musix_similarity_inputs")  # server-side cursor: rows arrive in batches
+    cur = db.cursor(name="siansa_similarity_inputs")  # server-side cursor: rows arrive in batches
     cur.itersize = 2000
     cur.execute("""
         SELECT s.item_id, s.album, s.album_artist, s.author, e.embedding
